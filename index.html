@@ -131,6 +131,57 @@
         }
 
         /* ==========================================================================
+           MODAL DE LOGIN (JANELA FLUTUANTE)
+           ========================================================================== */
+        .login-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-modal-overlay.active {
+            display: flex;
+        }
+
+        .login-modal {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            animation: fadeIn 0.3s ease;
+            position: relative;
+        }
+
+        .login-modal h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .btn-close-modal {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        /* ==========================================================================
            PÁGINA DO CLIENTE (LOJA)
            ========================================================================== */
         #page-cliente {
@@ -477,10 +528,29 @@
             <div class="nav-actions">
                 <button class="btn-nav" aria-label="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
                 <button class="btn-nav" aria-label="Favoritos"><i class="fa-regular fa-heart"></i></button>
-                <button class="btn-nav btn-login" id="nav-btn-entrar" onclick="switchPage('vendedor')">Entrar</button>
+                <button class="btn-nav btn-login" id="nav-btn-entrar" onclick="handleAuthAction()">Entrar</button>
             </div>
         </div>
     </header>
+
+    <!-- JANELA FLUTUANTE DE LOGIN (MODAL) -->
+    <div class="login-modal-overlay" id="modal-login">
+        <div class="login-modal">
+            <button class="btn-close-modal" onclick="fecharModalLogin()"><i class="fa-solid fa-xmark"></i></button>
+            <h3>Área Restrita</h3>
+            <form id="form-login" onsubmit="realizarLogin(event)">
+                <div class="form-group">
+                    <label for="login-email">E-mail corporativo</label>
+                    <input type="email" id="login-email" class="form-control" required placeholder="seu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="login-senha">Senha de Acesso</label>
+                    <input type="password" id="login-senha" class="form-control" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-submit">Validar Credenciais</button>
+            </form>
+        </div>
+    </div>
 
     <!-- PÁGINA DO CLIENTE (LOJA) -->
     <div id="page-cliente" class="page active">
@@ -573,17 +643,91 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-        // 1. CONFIGURAÇÃO DO BANCO (Substitua a KEY pela chave longa 'anon' do seu painel)
+        // 1. CONFIGURAÇÃO DO BANCO
         const SUPABASE_URL = "https://wpdpbzvlggdpwvmgtxxn.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZHBienZsZ2dkcHd2bWd0eHhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2ODI4NzEsImV4cCI6MjEwMTI1ODg3MX0.EqB3SpVLQ4qspFEuUxwOs7vzPssdq16bBEK09QVFATk"; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let bancoProdutos = [];
+        let usuarioAutenticado = null;
 
         // Inicializador do Sistema ao carregar a página
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             carregarDadosDoBanco();
+            // Verifica se o vendedor já estava logado antes de atualizar a página
+            const { data } = await _supabase.auth.getSession();
+            if (data.session) {
+                usuarioAutenticado = data.session.user;
+                atualizarBotaoConexao(true);
+            }
         });
+
+        // Controle do Modal de Login
+        function abrirModalLogin() {
+            document.getElementById('modal-login').classList.add('active');
+        }
+
+        function fecharModalLogin() {
+            document.getElementById('modal-login').classList.remove('active');
+            document.getElementById('form-login').reset();
+        }
+
+        // Lógica Inteligente do Botão Superior Direito
+        function handleAuthAction() {
+            if (usuarioAutenticado) {
+                // Se já está logado, age como "Ir para o painel" ou "Sair" dependendo de onde está
+                const naPaginaVendedor = document.getElementById('page-vendedor').classList.contains('active');
+                if (naPaginaVendedor) {
+                    realizarLogout();
+                } else {
+                    switchPage('vendedor');
+                }
+            } else {
+                // Se não está logado, abre a caixinha de login
+                abrirModalLogin();
+            }
+        }
+
+        // Ação: Fazer Login no Supabase
+        async function realizarLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const senha = document.getElementById('login-senha').value;
+
+            const { data, error } = await _supabase.auth.signInWithPassword({
+                email: email,
+                password: senha,
+            });
+
+            if (error) {
+                alert("Acesso Negado: E-mail ou senha inválidos.");
+                console.error(error.message);
+            } else {
+                usuarioAutenticado = data.user;
+                fecharModalLogin();
+                atualizarBotaoConexao(true);
+                switchPage('vendedor');
+            }
+        }
+
+        // Ação: Desconectar Conta
+        async function realizarLogout() {
+            await _supabase.auth.signOut();
+            usuarioAutenticado = null;
+            atualizarBotaoConexao(false);
+            switchPage('cliente');
+        }
+
+        function atualizarBotaoConexao(logado) {
+            const navBtn = document.getElementById('nav-btn-entrar');
+            const naPaginaVendedor = document.getElementById('page-vendedor').classList.contains('active');
+            
+            if (logado) {
+                navBtn.textContent = naPaginaVendedor ? "Sair do Painel" : "Painel Admin";
+            } else {
+                navBtn.textContent = "Entrar";
+            }
+        }
 
         // Ação: Buscar informações no Banco de Dados
         async function carregarDadosDoBanco() {
@@ -604,19 +748,21 @@
 
         // Sistema de Troca de Páginas (Mecânica Single Page)
         function switchPage(pageId) {
+            // Bloqueio de segurança: impede acessar a página vendedor sem login ativo
+            if (pageId === 'vendedor' && !usuarioAutenticado) {
+                abrirModalLogin();
+                return;
+            }
+
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.getElementById(`page-${pageId}`).classList.add('active');
             
-            const navBtn = document.getElementById('nav-btn-entrar');
             if (pageId === 'vendedor') {
                 document.body.style.backgroundColor = 'var(--bg-painel)';
-                navBtn.textContent = "Sair do Painel";
-                navBtn.onclick = () => switchPage('cliente');
             } else {
                 document.body.style.backgroundColor = 'var(--bg-loja)';
-                navBtn.textContent = "Entrar";
-                navBtn.onclick = () => switchPage('vendedor');
             }
+            atualizarBotaoConexao(!!usuarioAutenticado);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -688,6 +834,7 @@
         // Ação: Cadastrar Nova Peça no Banco de Dados
         async function cadastrarProduto(e) {
             e.preventDefault();
+            if (!usuarioAutenticado) return alert("Sessão expirada. Faça login novamente.");
             
             const novoProd = {
                 nome: document.getElementById('prod-nome').value,
@@ -712,6 +859,8 @@
 
         // Ação: Atualizar Preço/Estoque Direto no Banco
         async function salvarAlteracaoInline(id) {
+            if (!usuarioAutenticado) return alert("Sessão expirada. Faça login novamente.");
+            
             const novoPreco = parseFloat(document.getElementById(`input-price-${id}`).value);
             const novoEstoque = parseInt(document.getElementById(`input-stock-${id}`).value);
 
@@ -731,6 +880,8 @@
 
         // Ação: Remover Produto do Banco
         async function deletarProduto(id) {
+            if (!usuarioAutenticado) return alert("Sessão expirada. Faça login novamente.");
+            
             if (confirm('Tem certeza de que deseja remover esta joia do banco de dados definitivamente?')) {
                 const { error } = await _supabase
                     .from('produtos')
