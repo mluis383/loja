@@ -1263,7 +1263,7 @@
                 ouvirStatusPagamento(novoPedido.id);
 
                 // 2. Chama a Edge Function para gerar o checkout no Mercado Pago
-                const response = await fetch('https://wpdpbzvlggdpwvmgtxxn.supabase.co/functions/v1/mercado-pago-payment', {
+                const response = await fetch('https://wpdpbzvlggdpwvmgtxxn.supabase.co/functions/v1/hyper-function', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
